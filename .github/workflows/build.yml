@@ -1,0 +1,45 @@
+name: Build QuizMasti APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Make Project
+        run: |
+          mkdir -p app/src/main/java/com/quizmasti/app
+          mkdir -p app/src/main/res/layout
+          echo "include ':app'" > settings.gradle
+          echo "buildscript{repositories{google();mavenCentral()} dependencies{classpath 'com.android.tools.build:gradle:8.1.4'}} allprojects{repositories{google();mavenCentral()}}" > build.gradle
+          cat > app/build.gradle <<'E'
+          plugins{id 'com.android.application'}
+          android{compileSdk 34;defaultConfig{applicationId "com.quizmasti.app";minSdk 21;targetSdk 34;versionCode 2;versionName "2.0"} buildTypes{release{minifyEnabled false}} namespace 'com.quizmasti.app'}
+          dependencies{implementation 'androidx.appcompat:appcompat:1.6.1'; implementation 'com.google.android.gms:play-services-ads:22.5.0'}
+          E
+          cat > app/src/main/AndroidManifest.xml <<'E'
+          <?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:allowBackup="true" android:label="QuizMasti Pakistan" android:icon="@android:drawable/sym_def_app_icon"><meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3689445994847302~6462674362"/><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
+          E
+          cat > app/src/main/res/layout/activity_main.xml <<'E'
+          <?xml version="1.0" encoding="utf-8"?><LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent"><com.google.android.gms.ads.AdView xmlns:ads="http://schemas.android.com/apk/res-auto" android:id="@+id/adView" android:layout_width="match_parent" android:layout_height="wrap_content" ads:adSize="BANNER" ads:adUnitId="ca-app-pub-3689445994847302/3836511029"/><WebView android:id="@+id/webview" android:layout_width="match_parent" android:layout_height="match_parent"/></LinearLayout>
+          E
+          cat > app/src/main/java/com/quizmasti/app/MainActivity.java <<'E'
+          package com.quizmasti.app; import android.os.Bundle; import android.webkit.*; import androidx.appcompat.app.AppCompatActivity; import com.google.android.gms.ads.*; public class MainActivity extends AppCompatActivity{WebView w; protected void onCreate(Bundle b){super.onCreate(b);setContentView(R.layout.activity_main); MobileAds.initialize(this, o->{}); AdView ad=findViewById(R.id.adView); ad.loadAd(new AdRequest.Builder().build()); w=findViewById(R.id.webview); w.setWebViewClient(new WebViewClient()); w.getSettings().setJavaScriptEnabled(true); w.getSettings().setDomStorageEnabled(true); w.loadUrl("https://quizmasti-pakistan.blogspot.com/");} public void onBackPressed(){if(w.canGoBack())w.goBack(); else super.onBackPressed();}}
+          E
+          mkdir -p gradle/wrapper
+          echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-bin.zip" > gradle/wrapper/gradle-wrapper.properties
+      - name: Build
+        run: |
+          gradle wrapper
+          ./gradlew assembleRelease --no-daemon
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizMasti-Your-AdMob-APK
+          path: app/build/outputs/apk/release/*.apk
