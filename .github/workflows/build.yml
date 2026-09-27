@@ -1,67 +1,34 @@
-name: Build QuizMasti APK
-on: [push, workflow_dispatch]
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Java
-        uses: actions/setup-java@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: Create Full Project
+          python-version: '3.10'
+
+      - name: Install Dependencies
         run: |
-          echo "include ':app'" > settings.gradle
-          mkdir -p app/src/main/java/com/quizmasti/app
-          mkdir -p app/src/main/res/layout
-          cat > app/build.gradle <<'EOF'
-          plugins { id 'com.android.application' }
-          android {
-            compileSdk 34
-            namespace 'com.quizmasti.app'
-            defaultConfig { applicationId "com.quizmasti.app"; minSdk 21; targetSdk 34; versionCode 3; versionName "3.0" }
-            buildTypes { release { minifyEnabled false } }
-          }
-          dependencies {
-            implementation 'androidx.appcompat:appcompat:1.6.1'
-            implementation 'com.google.android.gms:play-services-ads:22.5.0'
-          }
-          EOF
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-          <uses-permission android:name="android.permission.INTERNET"/>
-          <application android:allowBackup="true" android:label="QuizMasti Pakistan">
-          <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3689445994847302~6462674362"/>
-          <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
-          </application></manifest>
-          EOF
-          cat > app/src/main/res/layout/activity_main.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
-          <com.google.android.gms.ads.AdView xmlns:ads="http://schemas.android.com/apk/res-auto" android:id="@+id/adView" android:layout_width="match_parent" android:layout_height="wrap_content" ads:adSize="BANNER" ads:adUnitId="ca-app-pub-3689445994847302/3836511029"/>
-          <WebView android:id="@+id/webview" android:layout_width="match_parent" android:layout_height="match_parent"/></LinearLayout>
-          EOF
-          cat > app/src/main/java/com/quizmasti/app/MainActivity.java <<'EOF'
-          package com.quizmasti.app;
-          import android.os.Bundle; import android.webkit.*; import androidx.appcompat.app.AppCompatActivity; import com.google.android.gms.ads.*;
-          public class MainActivity extends AppCompatActivity {
-            WebView w; protected void onCreate(Bundle b){ super.onCreate(b); setContentView(R.layout.activity_main); MobileAds.initialize(this,o->{}); AdView ad=findViewById(R.id.adView); ad.loadAd(new AdRequest.Builder().build()); w=findViewById(R.id.webview); w.setWebViewClient(new WebViewClient()); w.getSettings().setJavaScriptEnabled(true); w.getSettings().setDomStorageEnabled(true); w.loadUrl("https://quizmasti-pakistan.blogspot.com/"); }
-            public void onBackPressed(){ if(w.canGoBack()) w.goBack(); else super.onBackPressed(); }
-          }
-          EOF
-          cat > build.gradle <<'EOF'
-          buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.android.tools.build:gradle:8.1.0' } }
-          allprojects { repositories { google(); mavenCentral() } }
-          EOF
+          sudo apt-get update
+          sudo apt-get install -y python3-pip zip unzip openjdk-17-jdk
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33
+
       - name: Build APK
         run: |
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
-          wget -q https://services.gradle.org/distributions/gradle-8.0-bin.zip
-          unzip -q gradle-8.0-bin.zip
-          ./gradle-8.0/bin/gradle assembleRelease --no-daemon
-      - uses: actions/upload-artifact@v4
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: QuizMasti-APK-Final
-          path: app/build/outputs/apk/release/*.apk
+          name: quizmasti-apk
+          path: bin/*.apk
