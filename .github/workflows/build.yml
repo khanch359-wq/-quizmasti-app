@@ -1,23 +1,34 @@
 name: Build APK
-on: [push]
+
+on:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip zip unzip openjdk-17-jdk libffi-dev libssl-dev
           pip install --upgrade pip
-          pip install buildozer cython==0.29.36
+          pip install buildozer cython==0.29.33
+
+      - name: Accept Licenses
+        run: |
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
       - name: Build APK
         run: |
